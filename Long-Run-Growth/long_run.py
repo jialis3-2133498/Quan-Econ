@@ -8,9 +8,9 @@ data_url = "mpd2020.xlsx"
 data = pd.read_excel(data_url,
                      sheet_name="Full data")
 # print(data.head())
-countries = data.country.unique()
-print(len(countries))  # Access how many countries in the df
+countries = data.country.unique()  # Access how many countries in the df
 country_years = []
+print(data.tail())
 for country in countries:
     cy_data = data[data.country == country]['year']
     ymin, ymax = cy_data.min(), cy_data.max()
@@ -25,6 +25,11 @@ code_to_name = data[
 gdp_pc = data.set_index(["countrycode", "year"])["gdppc"]
 gdp_pc = gdp_pc.unstack("countrycode")
 print(gdp_pc.tail())
+country_names = gdp_pc.columns
+# Generate a colormap with the number of colors matching the number of countries
+colors = cm.tab20(np.linspace(0, 0.95, len(country_names)))
+# Generating a dictionary to map each country to its corresponding color
+color_mapping = dict(zip(country_names, colors))
 
 # Create Color-mapping
 ### GDP per Capita
@@ -40,10 +45,10 @@ country = "GBR"
 ax.plot(gdp_pc[country].interpolate(), # interpolate means "--"
         linestyle="--",
         lw=2,
-        color="red")
+        color=color_mapping[country])
 ax.plot(gdp_pc[country],
         lw=2,
-        color="red")
+        color=color_mapping[country])
 ax.set_ylabel('international dollars')
 ax.set_xlabel('year')
 # International dollars are a hypothetical unit of currency that has the same purchasing
@@ -82,18 +87,60 @@ def draw_interp_plots(series,
         ax.legend(loc='upper left', frameon=False)
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
+# Define the namedtuple for the events.
+
+
+Event = namedtuple('Event', ['year_range', 'y_text', 'text', 'color', 'ymax'])
 fig2, ax2 = plt.subplots(dpi=100, figsize=(10, 6))
-draw_interp_plots(gdp_pc,
-                  ['USA', 'GBR', "CHN"],
+multicountries = ['CHN', "GBR", "USA"]
+draw_interp_plots(gdp_pc.loc[1500:],
+                  multicountries,
                   'international dollars',
                   'year',
-                  {
-                      'USA':'blue',
-                      'GBR':'red',
-                      'CHN':'green'
-                  },
+                  color_mapping,
                   code_to_name,
                   2,
                   False,
                   ax2)
+# Define the parameters for the events and the text
+ylim = ax.get_ylim()[1]
+b_params = {'color':'grey', 'alpha':0.2}
+t_params = {'fontsize':9,
+            'va':'center',
+            'ha':'center'}
+# Create a list of events to annotate
+events = [
+    Event((1650, 1652), ylim + ylim*0.04,
+          'the Navigation Act\n(1651)',
+          color_mapping['GBR'], 1),
+          Event((1655, 1684), ylim + ylim*0.13, 
+          'Closed-door Policy\n(1655-1684)', 
+          color_mapping['CHN'], 1.1),
+    Event((1848, 1850), ylim + ylim*0.22,
+          'the Repeal of Navigation Act\n(1849)', 
+          color_mapping['GBR'], 1.18),
+    Event((1765, 1791), ylim + ylim*0.04, 
+          'American Revolution\n(1765-1791)', 
+          color_mapping['USA'], 1),
+    Event((1760, 1840), ylim + ylim*0.13, 
+          'Industrial Revolution\n(1760-1840)', 
+          'grey', 1.1),
+    Event((1929, 1939), ylim + ylim*0.04, 
+          'the Great Depression\n(1929–1939)', 
+          'grey', 1),
+    Event((1978, 1979), ylim + ylim*0.13, 
+          'Reform and Opening-up\n(1978-1979)', 
+          color_mapping['CHN'], 1.1)
+]
+def draw_events(events, ax):
+    # Iterate over events and add annotations and vertical lines
+    for event in events:
+        event_mid = sum(event.year_range)/2
+        ax.text(event_mid,
+                event.y_text, event.text,
+                color = event.color, **t_params)
+        ax.axvspan(*event.year_range, color=event.color, alpha=0.2)
+        ax.axvline(event_mid, ymin=0, ymax=1, color=event.color,
+                   alpha=0.15)
+draw_events(events, ax2)
 plt.show()
